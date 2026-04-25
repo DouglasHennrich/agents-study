@@ -1,0 +1,25 @@
+{
+  "name": "claude-mini-copilot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Harness estilo Claude Code com Copilot como LLM (Track 4 do tutorial)",
+  "scripts": {
+    "build": "tsc -p .",
+    "dev": "tsx src/cli/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "picomatch": "^4.0.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "@types/picomatch": "^3.0.1",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.1"
+  }
+}

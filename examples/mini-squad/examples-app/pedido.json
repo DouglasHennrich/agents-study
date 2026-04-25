@@ -1,0 +1,9 @@
+{
+  "id": "PED-001",
+  "cliente": "ACME Ltda",
+  "itens": [
+    { "sku": "MOUSE-OPT-01", "descricao": "Mouse óptico USB", "quantidade": 10 },
+    { "sku": "TECL-MEC-02", "descricao": "Teclado mecânico ABNT2", "quantidade": 5 },
+    { "sku": "MON-24-IPS", "descricao": "Monitor 24'' IPS", "quantidade": 3 }
+  ]
+}
