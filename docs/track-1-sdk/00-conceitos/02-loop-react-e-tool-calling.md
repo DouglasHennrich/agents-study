@@ -8,8 +8,8 @@
 
 ```mermaid
 flowchart LR
-  T[Thought\n"preciso saber X"] --> A[Action\n"chamar tool Y"]
-  A --> O[Observation\n"resultado de Y"]
+  T["Thought<br/>preciso saber X"] --> A["Action<br/>chamar tool Y"]
+  A --> O["Observation<br/>resultado de Y"]
   O --> T
   T --> F[Final answer]
 ```
