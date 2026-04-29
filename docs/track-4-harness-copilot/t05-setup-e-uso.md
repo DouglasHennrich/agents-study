@@ -38,7 +38,7 @@ import { CopilotProvider } from './provider/copilot.js';
 const provider = new CopilotProvider({ token: 'ghu_...', model: 'gpt-4o-mini' });
 ```
 
-> ⚠️ A interface exata do `@github/copilot-sdk` pode variar. O adapter neste tutorial assume formato OpenAI Chat Completions. Se sua versão do SDK divergir, adapte `getClient()` em `src/provider/copilot.ts`.
+> **SDK v0.3+**: O `@github/copilot-sdk` v0.3+ usa sessões JSON-RPC — não mais `chat.completions.create()`. O provider deste tutorial usa `createSession()` + `sendAndWait()`. Veja `src/provider/copilot.ts`.
 
 ## Uso básico
 

@@ -96,16 +96,19 @@ Inclua **quando usar** e **limites** — reduz tool-call errado.
 
 ## Forçando tool específica
 
-OpenAI suporta `tool_choice` (Anthropic suporta de forma diferente):
+Com SDK v0.3+, o controle de qual tool chamar é feito via system message ou prompt — não há parâmetro equivalente a `tool_choice` na API de sessões. Para forçar uma tool específica, instrua o modelo diretamente:
 
 ```ts
-client.chat.completions.create({
-  // ...
-  tool_choice: { type: 'function', function: { name: 'bash' } },
+const session = await client.createSession({
+  model: 'gpt-4o-mini',
+  onPermissionRequest: approveAll,
+  systemMessage: {
+    content: 'Sempre use a tool `enter_plan_mode` antes de qualquer outra ação.',
+  },
 });
 ```
 
-Útil para fluxos guiados (ex.: "primeiro chame `enter_plan_mode`"). No `claude-mini-copilot` deixamos como auto.
+No `claude-mini-copilot` deixamos o modelo decidir qual tool usar.
 
 ## Próximo
 

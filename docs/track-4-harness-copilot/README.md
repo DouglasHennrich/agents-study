@@ -1,6 +1,6 @@
 # Trilha 4 — Harness estilo Claude Code com **Copilot como LLM**
 
-> Esta trilha mostra como **reaproveitar todo o harness** construído na [Trilha 3](../track-3-harness/README.md) trocando apenas o `LlmProvider` para usar o **GitHub Copilot SDK** (formato OpenAI Chat Completions) no lugar da Anthropic Messages API.
+> Esta trilha mostra como **reaproveitar todo o harness** construído na [Trilha 3](../track-3-harness/README.md) trocando apenas o `LlmProvider` para usar o **GitHub Copilot SDK v0.3+** (arquitetura baseada em sessões JSON-RPC) no lugar da Anthropic Messages API.
 
 ## Por que existe
 
@@ -19,7 +19,7 @@ flowchart LR
   end
   subgraph T4[Trilha 4]
     Q4[query.ts loop adaptado] --> P4[CopilotProvider]
-    P4 -->|chat.completions + tool_calls| C["@github/copilot-sdk"]
+    P4 -->|createSession + sendAndWait| C["@github/copilot-sdk v0.3+"]
   end
 ```
 
@@ -32,7 +32,7 @@ flowchart LR
 | Tool result | bloco `tool_result` em mensagem `user` | mensagem `role:"tool"` com `tool_call_id` |
 | Stop reason | `end_turn` / `tool_use` / `max_tokens` | `stop` / `tool_calls` / `length` |
 | System prompt | parâmetro `system` separado | mensagem `role:"system"` no array |
-| Streaming | event stream com block deltas | chunks com `choices[0].delta` |
+| Streaming | event stream com block deltas | eventos `assistant.message_delta` com `deltaContent` |
 
 Tudo isolado num **adapter**: o resto do código (loop, sub-agents, compaction, tasks, teams) **não muda**.
 
@@ -49,7 +49,7 @@ Tudo isolado num **adapter**: o resto do código (loop, sub-agents, compaction, 
 
 📂 [`examples/claude-mini-copilot/`](../../examples/claude-mini-copilot/) — projeto isolado, espelha estrutura do `claude-mini` mas com:
 
-- `src/provider/copilot.ts` — wrapper sobre `@github/copilot-sdk`.
+- `src/provider/copilot.ts` — wrapper sobre `@github/copilot-sdk` v0.3+ (sessões JSON-RPC).
 - `src/provider/types.ts` — interface comum (Message OpenAI-style).
 - `src/query.ts` — loop adaptado para `tool_calls`.
 - `src/tools/registry.ts` — `toSpecs()` no formato OpenAI.
@@ -70,6 +70,6 @@ Tudo isolado num **adapter**: o resto do código (loop, sub-agents, compaction, 
 | Já está no ecossistema GitHub (Actions, Copilot Workspace) | T4 |
 | Quer prompt cache fine-grained | T3 (Anthropic só) |
 | Streaming SSE com event types ricos | T3 |
-| Tool-calling clássico OpenAI | T4 |
+| Tool-calling gerenciado pelo SDK (loop interno) | T4 |
 
 ← [Voltar ao hub](../README.md)

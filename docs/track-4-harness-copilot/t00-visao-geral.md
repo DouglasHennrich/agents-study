@@ -21,17 +21,13 @@ export type ContentBlock =
 Copilot/OpenAI Chat Completions usa formato diferente:
 
 ```ts
-{
-  role: 'assistant',
-  content: 'texto opcional',
-  tool_calls: [{
-    id: 'call_xxx',
-    type: 'function',
-    function: { name: 'bash', arguments: '{"command":"ls"}' },
-  }],
-}
-// e a resposta da tool:
-{ role: 'tool', tool_call_id: 'call_xxx', content: 'arquivos: ...' }
+// SDK v0.3+: sessão JSON-RPC, não mais chat.completions
+const session = await client.createSession({
+  model: 'gpt-4o-mini',
+  onPermissionRequest: approveAll,
+});
+const event = await session.sendAndWait({ prompt: 'olá' });
+console.log(event?.data.content);
 ```
 
 Forçar um no outro daria gambiarra. **Solução**: cada trilha tem seu próprio `Message`/`StreamEvent` interno, e o `LlmProvider` traduz na fronteira.
@@ -61,7 +57,7 @@ flowchart TB
 ## O que muda concretamente
 
 1. **`src/provider/types.ts`** — `Message`/`StreamEvent` em formato OpenAI.
-2. **`src/provider/copilot.ts`** — wrapper sobre `@github/copilot-sdk` (chat.completions).
+2. **`src/provider/copilot.ts`** — wrapper sobre `@github/copilot-sdk` v0.3+ (sessões JSON-RPC).
 3. **`src/query.ts`** — adapta loop para detectar `tool_calls` (não `tool_use blocks`) e responder com `role:"tool"` (não `tool_result` block).
 4. **`src/tools/registry.ts`** — método `toSpecs()` retorna `{type:"function", function:{...}}`.
 

@@ -14,7 +14,7 @@ O Squad encapsula tudo em `SquadClient` (`packages/squad-sdk/src/client/`). Ele:
 2. Cria o cliente do Copilot SDK uma única vez (lazy).
 3. Expõe um método `chat({ messages, tools, model })` simples.
 
-Por baixo, faz `client.chat.completions.create(...)` no padrão OpenAI-compatible.
+Por baixo, o SDK v0.3+ usa sessões JSON-RPC: `createSession()` inicia a sessão e `sendAndWait()` envia a mensagem e aguarda a resposta via evento `assistant.message`.
 
 ## Construa o seu
 
@@ -22,11 +22,12 @@ Crie `src/client/types.ts` (espelha o protocolo OpenAI), `src/client/copilot-pro
 
 > Os arquivos já estão no repo: [`src/client/types.ts`](../../examples/mini-squad/src/client/types.ts), [`src/client/copilot-provider.ts`](../../examples/mini-squad/src/client/copilot-provider.ts).
 
-Pontos-chave do `CopilotProvider`:
+Pontos-chave do `CopilotProvider` (SDK v0.3+):
 
-- **Import dinâmico** do `@github/copilot-sdk` — falha gracefully em ambiente sem o SDK (útil em CI/teste com stub).
-- **Adapter shape**: traduz a resposta do SDK para o nosso `ChatResponse` interno. Isso isola a versão do SDK do resto do código.
-- **Tool calls** chegam como JSON string em `arguments` — fazemos `JSON.parse` aqui.
+- **`CopilotClient`** instanciado com `gitHubToken` — autenticação direta sem import dinâmico.
+- **Sessão por chamada**: `createSession()` + `sendAndWait()` retorna `AssistantMessageEvent` com `event.data.content`.
+- **Sistema de mensagens**: mensagens `system` são passadas via `systemMessage: { mode: 'replace', content }` no `createSession()`; mensagens `user` anteriores são repassadas via `sendAndWait()` para manter contexto multi-turn.
+- **Tool calls**: o SDK v0.3+ executa o loop ReAct internamente — `chat()` retorna a resposta final após o SDK ter resolvido eventuais tool calls.
 
 ### Exemplo de uso (manual, sem agent ainda)
 

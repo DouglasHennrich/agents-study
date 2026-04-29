@@ -51,91 +51,104 @@ export interface LlmProvider {
 }
 ```
 
-## Adapter sobre `@github/copilot-sdk`
+## Adapter sobre `@github/copilot-sdk` v0.3+
 
 📄 `src/provider/copilot.ts`
 
+> **SDK v0.3+ — arquitetura baseada em sessões JSON-RPC**
+>
+> Versões antigas do SDK expunham `client.chat.completions.create()` (formato OpenAI). O SDK v0.3+ usa sessões persistentes via JSON-RPC: você cria uma sessão com `createSession()`, envia mensagens com `session.send()` / `session.sendAndWait()`, e recebe eventos (`assistant.message_delta`, `session.idle`, etc.).
+>
+> **Tool calls**: com o SDK v0.3+, as tools são registradas com handlers no `createSession()`. O SDK executa o loop ReAct internamente — o `message_stop` retornará sempre `finish_reason: 'stop'` com o texto final (após o SDK ter resolvido eventuais tool calls).
+
 ```ts
-import type { LlmProvider, StreamRequest, StreamEvent, Message, ToolCall } from './types.js';
+import { CopilotClient, approveAll } from '@github/copilot-sdk';
+import type { LlmProvider, StreamRequest, StreamEvent, Message } from './types.js';
 
 export class CopilotProvider implements LlmProvider {
   name = 'copilot';
-  private clientPromise?: Promise<any>;
+  private client: CopilotClient;
 
-  constructor(private opts: { token?: string; model?: string } = {}) {}
-
-  private async getClient(): Promise<any> {
-    if (this.clientPromise) return this.clientPromise;
-    this.clientPromise = (async () => {
-      const mod: any = await import('@github/copilot-sdk').catch(() => null);
-      if (!mod) throw new Error('`@github/copilot-sdk` não instalado.');
-      const Client = mod.CopilotClient ?? mod.default;
-      return new Client({
-        token: this.opts.token ?? process.env.COPILOT_TOKEN,
-      });
-    })();
-    return this.clientPromise;
+  constructor(private opts: { token?: string; model?: string } = {}) {
+    this.client = new CopilotClient({
+      gitHubToken: this.opts.token ?? process.env.COPILOT_TOKEN,
+    });
   }
 
   async *stream(req: StreamRequest): AsyncIterable<StreamEvent> {
-    const client = await this.getClient();
-    const res = await client.chat.completions.create({
+    const systemContent = req.messages
+      .filter(m => m.role === 'system')
+      .map(m => m.content)
+      .filter(Boolean)
+      .join('\n');
+
+    const nonSystemMessages = req.messages.filter(m => m.role !== 'system');
+
+    const session = await this.client.createSession({
       model: req.model ?? this.opts.model ?? process.env.COPILOT_MODEL ?? 'gpt-4o-mini',
-      messages: req.messages.map(toOpenAi),
-      tools: req.tools.length > 0
-        ? req.tools.map((t) => ({
-            type: 'function',
-            function: { name: t.name, description: t.description, parameters: t.parameters },
-          }))
-        : undefined,
-      stream: false,
+      streaming: true,
+      onPermissionRequest: approveAll,
+      ...(systemContent ? {
+        systemMessage: { mode: 'replace' as const, content: systemContent },
+      } : {}),
     });
-    const choice = res.choices[0];
-    const toolCalls: ToolCall[] | undefined = choice.message.tool_calls?.map((tc: any) => ({
-      id: tc.id,
-      name: tc.function.name,
-      arguments: safeParse(tc.function.arguments),
-    }));
 
-    yield { type: 'message_start' };
-    if (choice.message.content) {
-      yield { type: 'text_delta', text: choice.message.content };
-    }
-    if (toolCalls) {
-      for (const tc of toolCalls) {
-        yield { type: 'tool_call_delta', id: tc.id, name: tc.name,
-                argumentsPartial: JSON.stringify(tc.arguments) };
+    try {
+      // Replay turns anteriores para manter contexto multi-turn
+      for (const msg of nonSystemMessages.slice(0, -1)) {
+        if (msg.role === 'user') {
+          await session.sendAndWait({ prompt: msg.content ?? '' });
+        }
       }
+
+      const lastMsg = nonSystemMessages.at(-1);
+
+      // Bridge callbacks → AsyncIterable (resolvers-first: garante await por chunk)
+      type Item = StreamEvent | 'done';
+      const pending: Item[] = [];
+      let waiting: ((item: Item) => void) | null = null;
+
+      const push = (item: Item) => {
+        if (waiting) { waiting(item); waiting = null; }
+        else { pending.push(item); }
+      };
+      const pull = (): Promise<Item> => {
+        if (pending.length > 0) return Promise.resolve(pending.shift()!);
+        return new Promise<Item>(resolve => { waiting = resolve; });
+      };
+
+      let fullContent = '';
+
+      const unsubDelta = session.on('assistant.message_delta', (event) => {
+        const text = (event.data as any).deltaContent ?? '';
+        fullContent += text;
+        push({ type: 'text_delta', text });
+      });
+
+      const unsubIdle = session.on('session.idle', () => {
+        unsubDelta(); unsubIdle();
+        push('done');
+      });
+
+      yield { type: 'message_start' };
+      await session.send({ prompt: lastMsg?.content ?? '' });
+
+      while (true) {
+        const item = await pull();
+        if (item === 'done') break;
+        yield item as StreamEvent;
+      }
+
+      yield {
+        type: 'message_stop',
+        finish_reason: 'stop',
+        message: { role: 'assistant', content: fullContent || null } as Message,
+        usage: undefined,
+      };
+    } finally {
+      await session.disconnect();
     }
-    yield {
-      type: 'message_stop',
-      finish_reason: choice.finish_reason,
-      message: {
-        role: 'assistant',
-        content: choice.message.content ?? null,
-        tool_calls: toolCalls,
-      },
-      usage: res.usage,
-    };
   }
-}
-
-function toOpenAi(m: Message): any {
-  const out: any = { role: m.role };
-  if (m.content !== undefined) out.content = m.content;
-  if (m.tool_calls) {
-    out.tool_calls = m.tool_calls.map((tc) => ({
-      id: tc.id, type: 'function',
-      function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
-    }));
-  }
-  if (m.tool_call_id) out.tool_call_id = m.tool_call_id;
-  if (m.name) out.name = m.name;
-  return out;
-}
-
-function safeParse(s: string): Record<string, unknown> {
-  try { return JSON.parse(s || '{}'); } catch { return {}; }
 }
 ```
 
@@ -189,16 +202,13 @@ export class MockProvider implements LlmProvider {
 }
 ```
 
-## Por que não streaming verdadeiro?
+## Streaming real com SDK v0.3+
 
-A versão acima pede `stream: false` ao SDK, depois "fakeia" os deltas. Razão:
+O SDK v0.3+ emite eventos `assistant.message_delta` com `deltaContent` à medida que o modelo gera tokens. A implementação acima usa o padrão **resolvers-first**: o consumer sempre faz `await pull()` antes de cada `yield`, garantindo que chunks sejam entregues incrementalmente.
 
-- O `@github/copilot-sdk` retorna chunks com `delta.tool_calls[i].function.arguments` em pedacinhos JSON parciais.
-- Concatenar arguments parciais com índices é **complexo**, e o ganho didático é zero.
-- Para um tutorial, pegar a resposta inteira e emitir 1 delta funciona perfeitamente.
-
-Se quiser streaming real, troque o `await client.chat.completions.create({stream:false})` por `for await (const chunk of res)` e acumule `delta.tool_calls`.
+Ao contrário da API OpenAI-compatible anterior (que usava `chat.completions.create({stream:true})`), não há `delta.tool_calls` para acumular — o loop ReAct é interno ao SDK.
 
 ## Próximo
 
 → [t02. Loop adaptado — `tool_calls` vs `tool_use`](t02-loop-adaptado.md)
+
