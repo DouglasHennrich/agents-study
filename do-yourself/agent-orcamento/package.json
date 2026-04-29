@@ -1,0 +1,33 @@
+{
+  "name": "agent-orcamento",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "bin": {
+    "agent-orcamento": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "dev": "COPILOT_TOKEN=\"$(gh auth token)\" tsx src/cli/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.33.0",
+  "dependencies": {
+		"@github/copilot-sdk": "^0.3.0",
+		"commander": "^14.0.3",
+		"picomatch": "^4.0.4",
+		"zod": "^4.3.6"
+	},
+	"devDependencies": {
+		"@types/node": "^25.6.0",
+		"tsx": "^4.21.0",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.5"
+	}
+}
