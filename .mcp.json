@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "nest-clean-blueprint": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/Users/douglashennrich/Documents/Projetos/nest-clean-blueprint/mcp-server/dist/index.js"
+      ],
+      "env": {
+        "GITHUB_REPO": "douglashennrich/nest-clean-blueprint",
+        "GITHUB_BRANCH": "main",
+        "LOCAL_CACHE_DIR": "/Users/douglashennrich/Documents/Projetos/custom-agent/.blueprint-cache"
+      }
+    }
+  }
+}

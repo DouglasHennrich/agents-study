@@ -1,0 +1,66 @@
+{
+  "name": "rag-agent",
+  "version": "1.0.0",
+  "description": "RAG Agent with NestJS, pgvector and Ollama",
+  "main": "dist/main.js",
+  "scripts": {
+    "start:dev": "nest start --watch",
+    "build": "nest build",
+    "migration:create": "typeorm migration:create src/@database/migrations/$npm_config_name",
+    "migration:run": "ts-node -r tsconfig-paths/register node_modules/typeorm/cli.js migration:run -d src/@database/data-source.ts",
+    "migration:revert": "ts-node -r tsconfig-paths/register node_modules/typeorm/cli.js migration:revert -d src/@database/data-source.ts",
+    "test:unit": "vitest run --exclude '**/*.e2e.spec.ts'",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.0.8",
+      "onFail": "download"
+    }
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@types/express": "^5.0.6",
+    "@types/express-serve-static-core": "^5.1.1",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.0.0",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/pg": "^8.11.0",
+    "@vitest/coverage-v8": "^3.0.0",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.4.0",
+    "vitest": "^3.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "protobufjs"
+    ]
+  },
+  "dependencies": {
+    "@langchain/community": "^0.3.0",
+    "@langchain/ollama": "^0.2.0",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/config": "^4.0.4",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/typeorm": "^11.0.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.0.0",
+    "langchain": "^0.3.0",
+    "multer": "^1.4.5-lts.1",
+    "pdf-parse": "^1.1.1",
+    "pg": "^8.12.0",
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.8.0",
+    "typeorm": "^0.3.20",
+    "zod": "^3.23.0"
+  }
+}

@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: rag-agent-postgres
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-raguser}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-ragpassword}
+      POSTGRES_DB: ${DATABASE_NAME:-ragdb}
+    ports:
+      - "${DATABASE_PORT:-5432}:5432"
+    volumes:
+      - rag_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-raguser} -d ${DATABASE_NAME:-ragdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  rag_pgdata:
