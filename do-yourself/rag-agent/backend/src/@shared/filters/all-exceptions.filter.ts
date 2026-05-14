@@ -4,15 +4,18 @@ import {
   ArgumentsHost,
   HttpException,
   HttpStatus,
-  Logger,
 } from "@nestjs/common";
 import { Request, Response } from "express";
 import { ZodError } from "zod";
 import { AbstractApplicationException } from "../errors/abstract-application-exception";
+import { ILogger } from "../classes/custom-logger";
+import { AsyncContext } from "../classes/async-context";
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
-  private readonly logger = new Logger(AllExceptionsFilter.name);
+  constructor(private readonly logger: ILogger) {
+    this.logger.setContextName(AllExceptionsFilter.name);
+  }
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -52,10 +55,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return;
     }
 
-    this.logger.error(
-      "Unexpected error",
-      exception instanceof Error ? exception.stack : String(exception),
-    );
+    this.logger.error("Unexpected error", {
+      requestId: AsyncContext.getRequestId(),
+      error: exception instanceof Error ? exception.stack : String(exception),
+    });
 
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,

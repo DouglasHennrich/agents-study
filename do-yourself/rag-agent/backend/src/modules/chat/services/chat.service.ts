@@ -4,14 +4,14 @@ import { Result } from "../../../@shared/classes/result";
 import { ILogger } from "../../../@shared/classes/custom-logger";
 import { TEnvService } from "../../env/services/env.service";
 import { IDocumentsRepository } from "../../documents/repositories/documents.repository";
-import { IEmbeddingProvider } from "../../../providers/ollama/embedding.provider";
-import { ILlmProvider } from "../../../providers/ollama/llm.provider";
 import {
   IChatPresenter,
   TChatPresenterResponse,
 } from "../presenters/chat.presenter";
 import { TChatDtoBodySchema } from "../dto/chat.dto";
 import { NoRelevantContextException } from "../errors/no-relevant-context.exception";
+import { IEmbeddingProvider } from "@/@shared/providers/ollama/embedding.provider";
+import { ILlmProvider } from "@/@shared/providers/ollama/llm.provider";
 
 export abstract class TChatService extends AbstractService<
   TChatDtoBodySchema,

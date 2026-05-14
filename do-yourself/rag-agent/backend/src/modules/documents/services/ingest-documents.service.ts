@@ -1,12 +1,11 @@
 import { Injectable } from "@nestjs/common";
-import * as pdfParse from "pdf-parse";
+import pdfParse from "pdf-parse";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { AbstractService } from "../../../@shared/classes/service";
 import { Result } from "../../../@shared/classes/result";
 import { ILogger } from "../../../@shared/classes/custom-logger";
 import { TEnvService } from "../../env/services/env.service";
 import { IDocumentsRepository } from "../repositories/documents.repository";
-import { IEmbeddingProvider } from "../../../providers/ollama/embedding.provider";
 import {
   IDocumentPresenter,
   TIngestResultPresenterResponse,
@@ -14,6 +13,7 @@ import {
 import { IIngestResult } from "../models/ingest-result.struct";
 import { NoFilesProvidedException } from "../errors/no-files-provided.exception";
 import { InvalidFileTypeException } from "../errors/invalid-file-type.exception";
+import { IEmbeddingProvider } from "@/@shared/providers/ollama/embedding.provider";
 
 export interface IIngestDocumentsFile {
   originalname: string;

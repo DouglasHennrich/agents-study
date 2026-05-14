@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { EnvModule } from "./modules/env/env.module";
 import { DatabaseModule } from "./@database/database.module";
@@ -6,6 +6,8 @@ import { DocumentsModule } from "./modules/documents/documents.module";
 import { ChatModule } from "./modules/chat/chat.module";
 import { LoggerModule } from "./@shared/modules/logger.module";
 import { envSchema } from "./modules/env/env";
+import { RequestIdMiddleware } from "./@shared/middlewares/request-id.middleware";
+import { RequestLoggerMiddleware } from "./@shared/middlewares/request-logger.middleware";
 
 @Module({
   imports: [
@@ -20,4 +22,12 @@ import { envSchema } from "./modules/env/env";
     ChatModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer
+      .apply(RequestIdMiddleware)
+      .forRoutes("*")
+      .apply(RequestLoggerMiddleware)
+      .forRoutes("*");
+  }
+}

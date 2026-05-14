@@ -4,6 +4,7 @@
   "description": "RAG Agent with NestJS, pgvector and Ollama",
   "main": "dist/main.js",
   "scripts": {
+    "check": "pnpm tsc --noEmit",
     "start:dev": "nest start --watch",
     "build": "nest build",
     "migration:create": "typeorm migration:create src/@database/migrations/$npm_config_name",
@@ -24,18 +25,18 @@
     }
   },
   "devDependencies": {
-    "@nestjs/cli": "^11.0.0",
+    "@nestjs/cli": "^11.0.21",
     "@types/express": "^5.0.6",
     "@types/express-serve-static-core": "^5.1.1",
-    "@types/multer": "^1.4.12",
-    "@types/node": "^22.0.0",
+    "@types/multer": "^1.4.13",
+    "@types/node": "^22.19.19",
     "@types/pdf-parse": "^1.1.5",
-    "@types/pg": "^8.11.0",
-    "@vitest/coverage-v8": "^3.0.0",
+    "@types/pg": "^8.20.0",
+    "@vitest/coverage-v8": "^3.2.4",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.4.0",
-    "vitest": "^3.0.0"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -44,23 +45,23 @@
     ]
   },
   "dependencies": {
-    "@langchain/community": "^0.3.0",
-    "@langchain/ollama": "^0.2.0",
-    "@nestjs/common": "^11.0.0",
+    "@langchain/community": "^0.3.59",
+    "@langchain/ollama": "^0.2.4",
+    "@nestjs/common": "^11.1.19",
     "@nestjs/config": "^4.0.4",
-    "@nestjs/core": "^11.0.0",
-    "@nestjs/platform-express": "^11.0.0",
-    "@nestjs/typeorm": "^11.0.0",
+    "@nestjs/core": "^11.1.19",
+    "@nestjs/platform-express": "^11.1.19",
+    "@nestjs/typeorm": "^11.0.1",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "helmet": "^8.0.0",
-    "langchain": "^0.3.0",
-    "multer": "^1.4.5-lts.1",
-    "pdf-parse": "^1.1.1",
-    "pg": "^8.12.0",
-    "reflect-metadata": "^0.2.0",
-    "rxjs": "^7.8.0",
-    "typeorm": "^0.3.20",
-    "zod": "^3.23.0"
+    "helmet": "^8.1.0",
+    "langchain": "^0.3.37",
+    "multer": "^2.1.1",
+    "pdf-parse": "^1.1.4",
+    "pg": "^8.20.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "typeorm": "^0.3.29",
+    "zod": "^3.25.76"
   }
 }

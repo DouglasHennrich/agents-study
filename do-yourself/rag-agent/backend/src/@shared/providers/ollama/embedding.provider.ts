@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { OllamaEmbeddings } from "@langchain/ollama";
-import { TEnvService } from "../../modules/env/services/env.service";
+import { TEnvService } from "@/modules/env/services/env.service";
 
 export abstract class IEmbeddingProvider {
   abstract embed(texts: string[]): Promise<number[][]>;
