@@ -24,7 +24,7 @@ import {
 import { IngestDocumentsController } from "./controllers/ingest-documents.controller";
 import { ListSourcesController } from "./controllers/list-sources.controller";
 import { DeleteSourceController } from "./controllers/delete-source.controller";
-import { OllamaModule } from "../../providers/ollama/ollama.module";
+import { OllamaModule } from "@/@shared/providers/ollama/ollama.module";
 
 @Module({
   imports: [TypeOrmModule.forFeature([DocumentEntity]), OllamaModule],
