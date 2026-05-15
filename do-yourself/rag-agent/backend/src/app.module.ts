@@ -21,13 +21,6 @@ import { RequestLoggerMiddleware } from "./@shared/middlewares/request-logger.mi
     DocumentsModule,
     ChatModule,
   ],
+  providers: [RequestIdMiddleware, RequestLoggerMiddleware],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    consumer
-      .apply(RequestIdMiddleware)
-      .forRoutes("*")
-      .apply(RequestLoggerMiddleware)
-      .forRoutes("*");
-  }
-}
+export class AppModule {}

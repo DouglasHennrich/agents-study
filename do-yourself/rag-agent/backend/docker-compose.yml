@@ -1,13 +1,17 @@
+name: rag-agent
+
 services:
   postgres:
     image: pgvector/pgvector:pg16
     container_name: rag-agent-postgres
+    env_file:
+      - .env
     environment:
       POSTGRES_USER: ${DATABASE_USER:-raguser}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-ragpassword}
       POSTGRES_DB: ${DATABASE_NAME:-ragdb}
     ports:
-      - "${DATABASE_PORT:-5432}:5432"
+      - "${DATABASE_PORT:-5433}:5432"
     volumes:
       - rag_pgdata:/var/lib/postgresql/data
     healthcheck:
