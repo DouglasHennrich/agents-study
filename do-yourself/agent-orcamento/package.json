@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "tsc -p .",
-    "dev": "COPILOT_TOKEN=\"$(gh auth token)\" tsx src/cli/index.ts",
+    "dev": "tsx src/cli/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit"
@@ -19,7 +19,6 @@
   "license": "ISC",
   "packageManager": "pnpm@10.33.0",
   "dependencies": {
-    "@github/copilot-sdk": "^0.3.0",
     "commander": "^14.0.3",
     "dotenv": "^17.4.2",
     "picomatch": "^4.0.4",
