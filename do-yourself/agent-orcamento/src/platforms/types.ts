@@ -1,0 +1,47 @@
+// src/platforms/types.ts
+export type Platform = 'autoamerica' | 'roberlo';
+
+export interface ParcelaPlan { label: string; }
+
+export interface PlatformConfig {
+  id: Platform;
+  url: string;
+  tipoOrcamento: string;
+  tabelaPrecos?: string;
+  transportadora: string;
+  frete: 'CIF' | 'FOB';
+  minOrderValue: number;
+  /** Per-line discount % from box count (AA). Returns 0 when none applies. */
+  computeLineDiscount(boxes: number): number;
+  /** Installment plan from the order total. */
+  computeParcelas(total: number): ParcelaPlan;
+}
+
+export interface ProductOption { code: string; name: string; }
+
+export interface StartQuoteOpts {
+  client: string;
+  tipo: string;
+  tabelaPrecos?: string;
+  transportadora: string;
+  frete: string;
+}
+
+export interface DriverResult<T = unknown> {
+  status: 'success' | 'warning' | 'error';
+  summary: string;
+  data?: T;
+  next_actions?: string[];
+}
+
+export interface IPortalDriver {
+  login(): Promise<DriverResult>;
+  startQuote(opts: StartQuoteOpts): Promise<DriverResult>;
+  searchProducts(terms: string): Promise<DriverResult<ProductOption[]>>;
+  addLine(productCode: string, units: number): Promise<DriverResult>;
+  readLinePrice(productCode: string): Promise<DriverResult<{ unit: number; total: number }>>;
+  applyDiscount(productCode: string, pct: number): Promise<DriverResult>;
+  readOrderTotal(): Promise<DriverResult<number>>;
+  setParcelas(plan: ParcelaPlan): Promise<DriverResult>;
+  save(): Promise<DriverResult>;
+}
