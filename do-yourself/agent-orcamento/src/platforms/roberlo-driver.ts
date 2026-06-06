@@ -340,13 +340,21 @@ export class RoberloDriver implements IPortalDriver {
     await this.evalRaw(`descPolimento('${n}'); 'ok'`);
     await new Promise(r => setTimeout(r, 400));
 
-    const pctStr = pct.toFixed(2).replace('.', ',');
+    // Portal expects integer "basis points × 100": 15% → "1500", which it formats to "15,00%"
+    const pctStr = String(Math.round(pct * 100));
 
     if (whichDesc === 3) {
-      // Desconto 03 field is disabled by default — must enable
+      // iCK_XDESC03 may be disabled via JS property (not only HTML attribute) — clear both
       await this.evalRaw(`
         var d3 = document.getElementById('iCK_XDESC03${n}');
-        if (d3) { d3.removeAttribute('disabled'); d3.value = ${JSON.stringify(pctStr)}; }
+        if (d3) {
+          d3.removeAttribute('disabled');
+          d3.disabled = false;
+          d3.removeAttribute('readonly');
+          d3.value = ${JSON.stringify(pctStr)};
+          d3.dispatchEvent(new Event('input', {bubbles:true}));
+          d3.dispatchEvent(new Event('change', {bubbles:true}));
+        }
         vldDesc('${n}');
         'done'
       `);
@@ -354,7 +362,11 @@ export class RoberloDriver implements IPortalDriver {
       // Desconto 02 field is enabled by default
       await this.evalRaw(`
         var d2 = document.getElementById('iCK_XDESC02${n}');
-        if (d2) { d2.value = ${JSON.stringify(pctStr)}; }
+        if (d2) {
+          d2.value = ${JSON.stringify(pctStr)};
+          d2.dispatchEvent(new Event('input', {bubbles:true}));
+          d2.dispatchEvent(new Event('change', {bubbles:true}));
+        }
         vldDesc('${n}');
         'done'
       `);

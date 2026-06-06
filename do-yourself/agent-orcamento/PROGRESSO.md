@@ -12,10 +12,10 @@
 |---|--------|--------|-------|
 | 0–10 | Core (order, quantity, db, resolver, orchestrator, etc.) | ✅ Concluído | Testes passando |
 | 11 | Auto America driver (live mapping) | ✅ Concluído | Ver detalhes abaixo |
-| 12 | Roberlo driver (live mapping) | ⏳ Pendente | Próxima tarefa |
+| 12 | Roberlo driver (live mapping) | ✅ Concluído | Ver detalhes abaixo |
 | 13 | Product resolver | ✅ Concluído | |
 | 14 | Orchestrator | ✅ Concluído | |
-| 15 | CLI `run` command | ⏳ Pendente | |
+| 15 | CLI `run` command | ✅ Concluído | |
 | 16 | Full verification (`pnpm test && pnpm build && pnpm lint`) | ⏳ Pendente | |
 
 ---
@@ -57,26 +57,56 @@ Ver `resources/auto-america-roteiro.md` para snippets JS detalhados.
 
 ---
 
-## Task 12 — Roberlo driver ⏳
+## Task 12 — Roberlo driver ✅
 
-**Arquivo a criar:** `src/platforms/roberlo-driver.ts`
+**Arquivo criado:** `src/platforms/roberlo-driver.ts`
 
-**O que precisa ser mapeado (com browser headed):**
-- URL de login
-- Formulário de novo orçamento (Tipo = "Previsto")
-- Busca de produto (bootstrap-select — diferente do select2 do AA)
-- Campo de quantidade
-- Campos de desconto (Desconto 02 → Desconto 03 como fallback)
-- Campo de total
-- Transportadora TRANS-FACE
-- Condição de pagamento (30/60/90)
-- Botão salvar
+### Mapeamento de campos (resultado do live mapping com browser headed)
 
-**Credenciais:** `.env` → `ROBERLO_USER` / `ROBERLO_PASS`
+**Navegação (CRÍTICO — manter sessão):**
+- Login: navegar diretamente para `http://52.67.57.130/portal/U_PortalLogin.apw`
+- Novo orçamento: **NÃO navegar por URL** → usar JS click em âncora `'Orçamento de Venda'`
+  - Motivo: navegação direta perde token de sessão e redireciona para login
+
+**Cabeçalho do orçamento:**
+- Cliente: `CJ_CLIENTE` (select, busca por CNPJ/nome em `o.text.includes(term)`)
+- Tipo de Orçamento: `CJ_XTPORC` (value `'2'` = Previsto)
+- Tipo de Frete: `CJ_TPFRETE` (value `'C'` = CIF)
+- Transportadora: `CJ_XTRANSP` (value `'000293'` = TRANS-FACE 61683652000243)
+- Condição de Pagamento: `CJ_CONDPAG` (value `'031'` = 30/60, `'032'` = 30/60/90)
+
+**Itens (padrão NN = 2 dígitos: 01, 02, ...):**
+- Seleção de tabela: `CK_XTABELA{NN}` (select — **obrigatório antes do produto**)
+- Produto: `CK_PRODUTO{NN}` (select, carrega após tabela selecionada)
+- Quantidade: `CK_QTDVEN{NN}` (disabled → precisa `removeAttribute('disabled')`)
+- Total linha: `CK_VALOR{NN}`, preço unit: `CK_XPRCIMP{NN}`
+
+**Totais:**
+- Total do pedido: `TOTAL_ORC` (referência para mínimo e parcelas)
+
+**Botões:**
+- Novo Item: `btAddItm`
+- Salvar: `btSalvar`
+
+**Fluxo de desconto (2 modais):**
+1. Modal informativo: `detalheOrc('NN')` → ler `% Desconto 2` e `% Desconto 3` (labels em `.modal.in`)
+   - Fechar: `.bootbox-close-button`
+2. Modal aplicar: `descPolimento('NN')` → campo `iCK_XDESC02{NN}` ou `iCK_XDESC03{NN}`
+   - `% Desconto 2 > 0` → aplicar em `iCK_XDESC02{NN}` (habilitado por padrão)
+   - `% Desconto 3 > 0` → `iCK_XDESC03{NN}` (disabled por padrão — removeAttribute + disabled=false)
+   - **CRÍTICO — formato do valor**: portal espera inteiro × 100 → `15%` = `"1500"` (não `"15,00"`)
+   - Função de recálculo: `vldDesc('NN')`
+   - Confirmar: `button[data-bb-handler="sucess"]`
+
+**Problema ERR_BLOCKED_BY_CLIENT:**
+- Chrome HTTPS-First mode bloqueia `http://52.67.57.130`
+- Solução: rodar em `--headed` e usuário clica "Ir para o site" no modal de segurança
+- Flags `--disable-features=HttpsUpgrades,HttpsFirstModeV2` causam `ERR_TOO_MANY_REDIRECTS`
+- Modo headless causa "Multiple targets not supported in headless mode"
 
 ---
 
-## Task 15 — CLI `run` command ⏳
+## Task 15 — CLI `run` command ✅
 
 **Arquivo a criar:** `src/cli/index.ts`
 
@@ -116,6 +146,10 @@ Possíveis ajustes necessários:
 3. **exactOptionalPropertyTypes** (task 14): `tabelaPrecos: platform.tabelaPrecos` (string|undefined) não era atribuível a propriedade opcional. Corrigido com spread condicional: `...(platform.tabelaPrecos !== undefined ? { tabelaPrecos: platform.tabelaPrecos } : {})`.
 
 4. **Refs mudam após fechar/reabrir browser**: Após `--headed`, refs do snapshot mudam. Sempre re-snapshot antes de usar refs.
+
+5. **Roberlo desconto — formato do valor** (task 12): Portal espera inteiro × 100 para percentual. `15%` → `"1500"` (não `"15,00"`). Corrigido com `String(Math.round(pct * 100))` em `roberlo-driver.ts:applyDiscount`.
+
+6. **Roberlo desconto — campo iCK_XDESC03 bloqueado** (task 12): `disabled=""` é atributo HTML mas pode ser reativado por JS. Correção: `removeAttribute('disabled')` + `d3.disabled = false` + `removeAttribute('readonly')` + dispatch de `input`/`change` antes de `vldDesc`.
 
 ---
 
