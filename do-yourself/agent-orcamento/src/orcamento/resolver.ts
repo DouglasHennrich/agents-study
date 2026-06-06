@@ -40,9 +40,16 @@ export async function resolveLine(line: OrderLine, deps: ResolveDeps): Promise<R
     );
     if (picked) {
       const unitsPerBox = await prompter.askInt(`Quantas unidades = 1 caixa de "${picked.name}"?`);
+      const extraRaw = await prompter.ask(
+        `Outros nomes para este produto (separados por vírgula, ou Enter para pular):`,
+      );
+      const extras = extraRaw.split(',').map((s) => s.trim()).filter(Boolean);
       repo.save({
-        platform, aliasRaw: line.name,
-        productCode: picked.code, productName: picked.name, unitsPerBox,
+        platform,
+        aliases: [line.name, ...extras],
+        productCode: picked.code,
+        productName: picked.name,
+        unitsPerBox,
       });
       return build(line, picked.code, picked.name, unitsPerBox);
     }

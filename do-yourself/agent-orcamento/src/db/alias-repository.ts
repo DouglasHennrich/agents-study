@@ -14,7 +14,7 @@ export interface AliasRecord {
 
 export interface SaveAliasInput {
   platform: Platform;
-  aliasRaw: string;
+  aliases: string[];
   productCode: string;
   productName: string;
   unitsPerBox: number;
@@ -55,15 +55,18 @@ export class AliasRepository {
          product_name = excluded.product_name,
          units_per_box = excluded.units_per_box`,
     );
-    stmt.run(
-      input.platform,
-      normalizeAlias(input.aliasRaw),
-      input.aliasRaw,
-      input.productCode,
-      input.productName,
-      input.unitsPerBox,
-      new Date().toISOString(),
-    );
+    const now = new Date().toISOString();
+    for (const aliasRaw of input.aliases) {
+      stmt.run(
+        input.platform,
+        normalizeAlias(aliasRaw),
+        aliasRaw,
+        input.productCode,
+        input.productName,
+        input.unitsPerBox,
+        now,
+      );
+    }
   }
 
   close(): void {

@@ -38,7 +38,7 @@ describe('resolveLine', () => {
     const repo = { find: vi.fn(() => undefined), save: vi.fn() };
     const options = [{ code: '303535001', name: 'BRILHO RAP' }];
     const prompter: Prompter = {
-      ask: vi.fn(async () => 'brilho'),
+      ask: vi.fn(async () => ''),           // extra aliases: none
       choose: vi.fn(async () => options[0] as ProductOption | null),
       askInt: vi.fn(async () => 6),
     };
@@ -48,19 +48,39 @@ describe('resolveLine', () => {
     });
     expect(prompter.choose).toHaveBeenCalled();
     expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({
-      platform: 'autoamerica', aliasRaw: 'Produto A', productCode: '303535001', unitsPerBox: 6,
+      platform: 'autoamerica', aliases: ['Produto A'], productCode: '303535001', unitsPerBox: 6,
     }));
     expect(resolved.siteUnits).toBe(2);     // UN passes through
     expect(resolved.boxes).toBe(1);         // ceil(2/6) = 1
+  });
+
+  it('persists extra aliases when provided', async () => {
+    const repo = { find: vi.fn(() => undefined), save: vi.fn() };
+    const options = [{ code: '303535001', name: 'BRILHO RAP' }];
+    const prompter: Prompter = {
+      ask: vi.fn(async () => 'brilho mothers, mothers brilho'),
+      choose: vi.fn(async () => options[0] as ProductOption | null),
+      askInt: vi.fn(async () => 6),
+    };
+    await resolveLine(
+      { name: 'Produto A', quantity: undefined },
+      { platform: 'autoamerica', repo: repo as any, driver: stubDriver(options), prompter },
+    );
+    expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({
+      aliases: ['Produto A', 'brilho mothers', 'mothers brilho'],
+    }));
   });
 
   it('re-searches when the user picks null then chooses', async () => {
     const repo = { find: vi.fn(() => undefined), save: vi.fn() };
     const opts = [{ code: '1', name: 'A' }];
     const choose = vi.fn()
-      .mockResolvedValueOnce(null)         // first: none -> re-search
-      .mockResolvedValueOnce(opts[0]!);    // second: pick
-    const prompter: Prompter = { ask: vi.fn(async () => 'a'), choose, askInt: vi.fn(async () => 3) };
+      .mockResolvedValueOnce(null)          // first: none -> re-search
+      .mockResolvedValueOnce(opts[0]!);     // second: pick
+    const ask = vi.fn()
+      .mockResolvedValueOnce('a')           // re-search terms
+      .mockResolvedValueOnce('');           // extra aliases: none
+    const prompter: Prompter = { ask, choose, askInt: vi.fn(async () => 3) };
     const resolved = await resolveLine(
       { name: 'Z', quantity: undefined },
       { platform: 'roberlo', repo: repo as any, driver: stubDriver(opts), prompter },
