@@ -46,6 +46,10 @@ describe('RoberloDriver.exportQuote', () => {
     const driver = new RoberloDriver(runnerReturning(okPayload), 'u', 'p');
     const res = await driver.exportQuote();
     expect(res.status).toBe('success');
-    expect(res.data?.orcamentoNumber).toBe('098171');
+    expect(res.data).toEqual({
+      pdfBase64: 'JVBERi0=',
+      orcamentoNumber: '098171',
+      clientName: 'ZIKALIMP PRODUTOS DE LIMPEZA LTDA',
+    });
   });
 });
