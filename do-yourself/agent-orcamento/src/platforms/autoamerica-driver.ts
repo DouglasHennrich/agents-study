@@ -178,11 +178,15 @@ export class AutoAmericaDriver implements IPortalDriver {
               var oRet = JSON.parse(data);
               if (!oRet.erro) result = String(oRet.quantidadeembalagem ?? '');
             } catch(e) {}
+          },
+          error: function() {
+            result = '__ERROR__';
           }
         });
         return result;
       })()
     `);
+    if (raw === '__ERROR__') return undefined;
     const n = parseInt(raw, 10);
     return n > 0 ? n : undefined;
   }
@@ -225,9 +229,10 @@ export class AutoAmericaDriver implements IPortalDriver {
     // Populate price field by calling U_GATPROD.APW directly (async:false).
     // jQuery .trigger('change') does NOT fire native onchange attributes, so
     // gatProduto() is never called automatically — we replicate its AJAX call here.
-    await this.evalRaw(`
+    const priceResult = await this.evalRaw(`
       (function() {
         var pr = new URLSearchParams(location.search).get('PR') || '';
+        var result = '';
         jQuery.ajax({
           type: 'POST',
           url: 'U_GATPROD.APW' + (pr ? '?PR=' + encodeURIComponent(pr) : ''),
@@ -249,13 +254,22 @@ export class AutoAmericaDriver implements IPortalDriver {
                 var priceEl = document.getElementById('CK_XPRCIMP${n}');
                 if (priceEl) priceEl.value = oRet.preco || '';
                 var qtdEl = document.getElementById('QTD_EMB${n}');
-                if (qtdEl) qtdEl.value = String(oRet.quantidadeembalagem || '1');
+                if (qtdEl) qtdEl.value = oRet.quantidadeembalagem != null ? String(oRet.quantidadeembalagem) : '';
+                result = oRet.preco || '';
               }
             } catch(e) {}
+          },
+          error: function() {
+            result = '__ERROR__';
           }
         });
-      })(); 'done'
-    `);
+        return result;
+      })()`);
+
+    if (priceResult === '__ERROR__') {
+      this.itemCount -= 1;
+      return { status: 'error', summary: `Falha ao buscar preço do produto ${productCode} (U_GATPROD.APW)` };
+    }
 
     // Set quantity and trigger price recalculation
     await this.evalRaw(`
