@@ -1,4 +1,4 @@
-import * as readline from 'node:readline/promises';
+import * as readline from 'node:readline';
 import { stdin as input, stdout as output } from 'node:process';
 import type { ProductOption } from '../platforms/types.js';
 
@@ -16,10 +16,40 @@ export function formatOptions(options: ProductOption[]): string {
 }
 
 export class ConsolePrompter implements Prompter {
+  // Lines buffered from stdin as they arrive. When stdin is a pipe, all data
+  // arrives (and EOF fires) before any async portal work completes, so we must
+  // buffer eagerly and serve from the buffer when `ask()` is finally called.
+  private readonly lineBuffer: string[] = [];
+  private readonly pending: Array<(line: string) => void> = [];
+  private eof = false;
+  private readonly rl: readline.Interface;
+
+  constructor() {
+    this.rl = readline.createInterface({ input, output });
+    this.rl.on('line', (line) => {
+      const resolve = this.pending.shift();
+      if (resolve) resolve(line.trimEnd());
+      else this.lineBuffer.push(line.trimEnd());
+    });
+    this.rl.on('close', () => {
+      this.eof = true;
+      while (this.pending.length > 0) this.pending.shift()!('');
+    });
+  }
+
+  close(): void {
+    this.rl.close();
+  }
+
+  private readLine(): Promise<string> {
+    if (this.lineBuffer.length > 0) return Promise.resolve(this.lineBuffer.shift()!);
+    if (this.eof) return Promise.resolve('');
+    return new Promise(resolve => this.pending.push(resolve));
+  }
+
   async ask(question: string): Promise<string> {
-    const rl = readline.createInterface({ input, output });
-    try { return (await rl.question(`${question} `)).trim(); }
-    finally { rl.close(); }
+    output.write(`${question} `);
+    return this.readLine();
   }
 
   async askInt(question: string): Promise<number> {

@@ -4,7 +4,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { program } from 'commander';
 import { parseOrder } from '../orcamento/order.js';
-import { resolveLine } from '../orcamento/resolver.js';
 import { runOrcamento } from '../orcamento/orchestrator.js';
 import { AliasRepository } from '../db/alias-repository.js';
 import { ConsolePrompter } from '../io/prompt.js';
@@ -68,23 +67,20 @@ program
     const prompter = new ConsolePrompter();
 
     try {
-      // Resolve all order lines (cache lookup + interactive fallback)
-      const deps = { platform, repo, driver, prompter };
-      const lines = await Promise.all(order.produtos.map((l) => resolveLine(l, deps)));
-
-      // Run the full quote flow
       const result = await runOrcamento({
         platform: platformConfig,
         client: order.client,
-        lines,
+        orderLines: order.produtos,
         driver,
         prompter,
+        repo,
       });
 
       console.log(`\nOrçamento gerado com sucesso!`);
       console.log(`Total: R$ ${result.total.toFixed(2).replace('.', ',')}`);
       console.log(`Parcelas: ${result.parcelas}`);
     } finally {
+      prompter.close();
       repo.close();
     }
   });

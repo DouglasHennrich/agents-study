@@ -38,6 +38,8 @@ export interface IPortalDriver {
   login(): Promise<DriverResult>;
   startQuote(opts: StartQuoteOpts): Promise<DriverResult>;
   searchProducts(terms: string): Promise<DriverResult<ProductOption[]>>;
+  /** Read units-per-box for a product directly from the portal. Optional: not all portals expose this. */
+  readUnitsPerBox?(productCode: string): Promise<number | undefined>;
   addLine(productCode: string, units: number): Promise<DriverResult>;
   readLinePrice(productCode: string): Promise<DriverResult<{ unit: number; total: number }>>;
   applyDiscount(productCode: string, pct: number): Promise<DriverResult>;

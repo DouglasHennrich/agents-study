@@ -71,6 +71,49 @@ describe('resolveLine', () => {
     }));
   });
 
+  it('uses readUnitsPerBox from driver when available, skips askInt', async () => {
+    const repo = { find: vi.fn(() => undefined), save: vi.fn() };
+    const options = [{ code: '303535001', name: 'BRILHO RAP' }];
+    const driver = {
+      ...stubDriver(options),
+      readUnitsPerBox: vi.fn(async () => 12),
+    };
+    const askInt = vi.fn(async () => 6);
+    const prompter: Prompter = {
+      ask: vi.fn(async () => ''),
+      choose: vi.fn(async () => options[0] as ProductOption | null),
+      askInt,
+    };
+    const resolved = await resolveLine(
+      { name: 'Produto A', quantity: { value: 2, unit: 'CX' as const } },
+      { platform: 'autoamerica', repo: repo as any, driver: driver as any, prompter },
+    );
+    expect(driver.readUnitsPerBox).toHaveBeenCalledWith('303535001');
+    expect(askInt).not.toHaveBeenCalled();
+    expect(resolved.unitsPerBox).toBe(12);
+    expect(resolved.siteUnits).toBe(24); // 2 CX * 12 units/box
+  });
+
+  it('falls back to askInt when readUnitsPerBox returns undefined', async () => {
+    const repo = { find: vi.fn(() => undefined), save: vi.fn() };
+    const options = [{ code: '303535001', name: 'BRILHO RAP' }];
+    const driver = {
+      ...stubDriver(options),
+      readUnitsPerBox: vi.fn(async () => undefined),
+    };
+    const askInt = vi.fn(async () => 8);
+    const prompter: Prompter = {
+      ask: vi.fn(async () => ''),
+      choose: vi.fn(async () => options[0] as ProductOption | null),
+      askInt,
+    };
+    await resolveLine(
+      { name: 'Produto A', quantity: undefined },
+      { platform: 'autoamerica', repo: repo as any, driver: driver as any, prompter },
+    );
+    expect(askInt).toHaveBeenCalledWith(expect.stringContaining('BRILHO RAP'));
+  });
+
   it('re-searches when the user picks null then chooses', async () => {
     const repo = { find: vi.fn(() => undefined), save: vi.fn() };
     const opts = [{ code: '1', name: 'A' }];

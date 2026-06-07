@@ -1,14 +1,17 @@
 // src/orcamento/orchestrator.ts
 import type { PlatformConfig, IPortalDriver } from '../platforms/types.js';
 import type { Prompter } from '../io/prompt.js';
-import type { ResolvedLine } from './resolver.js';
+import type { OrderLine } from './order.js';
+import type { AliasRepository } from '../db/alias-repository.js';
+import { resolveLine, type ResolvedLine } from './resolver.js';
 
 export interface RunOrcamentoInput {
   platform: PlatformConfig;
   client: string;
-  lines: ResolvedLine[];
+  orderLines: OrderLine[];
   driver: IPortalDriver;
   prompter: Prompter;
+  repo: AliasRepository;
 }
 
 export interface RunOrcamentoResult { total: number; parcelas: string; }
@@ -16,7 +19,7 @@ export interface RunOrcamentoResult { total: number; parcelas: string; }
 const MAX_BUMP_ITERATIONS = 1000;
 
 export async function runOrcamento(input: RunOrcamentoInput): Promise<RunOrcamentoResult> {
-  const { platform, client, lines, driver, prompter } = input;
+  const { platform, client, orderLines, driver, prompter, repo } = input;
 
   await driver.login();
   await driver.startQuote({
@@ -26,6 +29,14 @@ export async function runOrcamento(input: RunOrcamentoInput): Promise<RunOrcamen
     transportadora: platform.transportadora,
     frete: platform.frete,
   });
+
+  // Resolve after startQuote: browser is now on the quote form, so searchProducts
+  // can read the pre-loaded product select options (CK_PRODUTO01).
+  // Sequential (not parallel) so readline prompts don't overlap.
+  const lines: ResolvedLine[] = [];
+  for (const l of orderLines) {
+    lines.push(await resolveLine(l, { platform: platform.id, repo, driver, prompter }));
+  }
 
   // Add all lines in units.
   const boxes = new Map<string, number>();
