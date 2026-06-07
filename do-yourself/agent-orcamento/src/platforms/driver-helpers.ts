@@ -35,7 +35,7 @@ const EXPORT_JS = `(function () {
     if (!rec) return JSON.stringify({ error: 'rec nao encontrado na primeira linha' });
 
     var headers = Array.from(document.querySelectorAll('table thead th')).map(function (th) {
-      return th.textContent.trim().toLowerCase();
+      return th.textContent.replace(/\s/g, ' ').trim().toLowerCase();
     });
     var orcIdx = headers.findIndex(function (h) { return h.indexOf('or') === 0 && h.indexOf('amento') >= 0; });
     var nomeIdx = headers.findIndex(function (h) { return h === 'nome'; });
@@ -46,6 +46,7 @@ const EXPORT_JS = `(function () {
     var pr = new URLSearchParams(location.search).get('PR') || '';
     var url = 'U_MailOrc.apw' + (pr ? '?PR=' + encodeURIComponent(pr) + '&opc=print' : '?opc=print');
     var filename = '';
+    // Replicates PrtOrc exactly: opc=print appears in both URL and POST body (portal requirement).
     jQuery.ajax({
       type: 'POST', async: false, cache: false, url: url,
       data: 'opc=print&doc=' + rec,
