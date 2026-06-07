@@ -7,6 +7,7 @@ import { parseOrder } from '../orcamento/order.js';
 import { runOrcamento } from '../orcamento/orchestrator.js';
 import { AliasRepository } from '../db/alias-repository.js';
 import { ConsolePrompter } from '../io/prompt.js';
+import { makeExportWriter } from '../io/export-writer.js';
 import { realRunner } from '../platforms/agent-browser-runner.js';
 import { AutoAmericaDriver } from '../platforms/autoamerica-driver.js';
 import { RoberloDriver } from '../platforms/roberlo-driver.js';
@@ -65,6 +66,7 @@ program
 
     const repo = new AliasRepository(opts.db);
     const prompter = new ConsolePrompter();
+    const exportWriter = makeExportWriter();
 
     try {
       const result = await runOrcamento({
@@ -74,11 +76,13 @@ program
         driver,
         prompter,
         repo,
+        exportWriter,
       });
 
       console.log(`\nOrçamento gerado com sucesso!`);
       console.log(`Total: R$ ${result.total.toFixed(2).replace('.', ',')}`);
       console.log(`Parcelas: ${result.parcelas}`);
+      console.log(`PDF exportado: ${result.exportPath}`);
     } finally {
       prompter.close();
       repo.close();

@@ -14,6 +14,7 @@ function stubDriver(options: ProductOption[]): IPortalDriver {
     setParcelas: vi.fn(),
     save: vi.fn(),
     searchProducts: vi.fn(async () => ({ status: 'success' as const, summary: '', data: options })),
+    exportQuote: vi.fn(),
   };
 }
 
