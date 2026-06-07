@@ -19,6 +19,15 @@ export interface PlatformConfig {
 
 export interface ProductOption { code: string; name: string; }
 
+export interface ExportedQuote {
+  /** Conteúdo do PDF do orçamento, codificado em base64. */
+  pdfBase64: string;
+  /** Número do orçamento exibido na listagem (ex.: "098171"). */
+  orcamentoNumber: string;
+  /** Nome do cliente como aparece na listagem (coluna "Nome"). */
+  clientName: string;
+}
+
 export interface StartQuoteOpts {
   client: string;
   tipo: string;
