@@ -122,7 +122,10 @@ export class AutoAmericaDriver implements IPortalDriver {
     `);
 
     // Wait for SelCliente() AJAX to populate CJ_TABELA options.
-    await this.waitFor(`document.getElementById('CJ_TABELA')?.options.length > 1`, 10000);
+    const tabelasLoaded = await this.waitFor(`document.getElementById('CJ_TABELA')?.options.length > 1`, 10000);
+    if (!tabelasLoaded) {
+      return { status: 'error', summary: 'Tabelas de preço não carregaram (SelCliente timeout)' };
+    }
 
     // 2. Set price table and call selProd() which loads products via synchronous AJAX.
     // opts.tabelaPrecos may be "099 - DESCRIÇÃO"; match by option value OR text.
@@ -137,7 +140,10 @@ export class AutoAmericaDriver implements IPortalDriver {
     `);
 
     // Wait for products to be populated (selProd uses async:false, but we verify anyway).
-    await this.waitFor(`document.getElementById('CK_PRODUTO01')?.options.length > 1`, 10000);
+    const produtosLoaded = await this.waitFor(`document.getElementById('CK_PRODUTO01')?.options.length > 1`, 10000);
+    if (!produtosLoaded) {
+      return { status: 'error', summary: 'Produtos não carregaram (selProd timeout)' };
+    }
 
     // 3. Set remaining header fields.
     await this.evalRaw(`
@@ -176,7 +182,8 @@ export class AutoAmericaDriver implements IPortalDriver {
             if (!data || data.toUpperCase().indexOf('<META HTTP-EQUIV') >= 0) return;
             try {
               var oRet = JSON.parse(data);
-              if (!oRet.erro) result = String(oRet.quantidadeembalagem ?? '');
+              if (oRet.erro) { result = '__ERROR__'; return; }
+              result = String(oRet.quantidadeembalagem ?? '');
             } catch(e) {}
           },
           error: function() {
@@ -250,13 +257,12 @@ export class AutoAmericaDriver implements IPortalDriver {
             if (!data || data.toUpperCase().indexOf('<META HTTP-EQUIV') >= 0) return;
             try {
               var oRet = JSON.parse(data);
-              if (!oRet.erro) {
-                var priceEl = document.getElementById('CK_XPRCIMP${n}');
-                if (priceEl) priceEl.value = oRet.preco || '';
-                var qtdEl = document.getElementById('QTD_EMB${n}');
-                if (qtdEl) qtdEl.value = oRet.quantidadeembalagem != null ? String(oRet.quantidadeembalagem) : '';
-                result = oRet.preco || '';
-              }
+              if (oRet.erro) { result = '__ERROR__'; return; }
+              var priceEl = document.getElementById('CK_XPRCIMP${n}');
+              if (priceEl) priceEl.value = oRet.preco || '';
+              var qtdEl = document.getElementById('QTD_EMB${n}');
+              if (qtdEl) qtdEl.value = oRet.quantidadeembalagem != null ? String(oRet.quantidadeembalagem) : '';
+              result = oRet.preco || '';
             } catch(e) {}
           },
           error: function() {
