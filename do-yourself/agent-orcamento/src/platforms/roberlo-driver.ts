@@ -1,6 +1,6 @@
-import type { IPortalDriver, StartQuoteOpts, DriverResult, ProductOption, ParcelaPlan } from './types.js';
+import type { IPortalDriver, StartQuoteOpts, DriverResult, ProductOption, ParcelaPlan, ExportedQuote } from './types.js';
 import type { AgentBrowserRunner } from './agent-browser-runner.js';
-import { parseBRL } from './driver-helpers.js';
+import { parseBRL, exportLastQuote } from './driver-helpers.js';
 
 const LOGIN_URL = 'http://52.67.57.130/portal/U_PortalLogin.apw';
 
@@ -507,5 +507,18 @@ export class RoberloDriver implements IPortalDriver {
     await this.evalRaw(`document.getElementById('btSalvar').click(); 'clicked'`);
     await this.waitLoad();
     return { status: 'success', summary: 'Orçamento Roberlo salvo com sucesso' };
+  }
+
+  async exportQuote(): Promise<DriverResult<ExportedQuote>> {
+    try {
+      const data = await exportLastQuote((js) => this.evalRaw(js));
+      return {
+        status: 'success',
+        summary: `Orçamento ${data.orcamentoNumber} exportado (${data.clientName})`,
+        data,
+      };
+    } catch (e) {
+      return { status: 'error', summary: `Falha ao exportar orçamento: ${(e as Error).message}` };
+    }
   }
 }

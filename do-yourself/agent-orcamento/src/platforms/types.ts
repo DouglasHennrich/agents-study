@@ -55,4 +55,6 @@ export interface IPortalDriver {
   readOrderTotal(): Promise<DriverResult<number>>;
   setParcelas(plan: ParcelaPlan): Promise<DriverResult>;
   save(): Promise<DriverResult>;
+  /** Exporta (baixa o PDF) do orçamento recém-criado, lendo a 1ª linha da listagem. */
+  exportQuote(): Promise<DriverResult<ExportedQuote>>;
 }
