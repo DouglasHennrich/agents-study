@@ -164,6 +164,9 @@ export class RoberloDriver implements IPortalDriver {
 
   async readUnitsPerBox(productCode: string): Promise<number | undefined> {
     const slot = '01';
+    // Safe to mutate CK_XTABELA01 here: readUnitsPerBox is always called during
+    // resolveLine (before any addLine), and addLine always re-sets CK_XTABELA{n}
+    // to the correct tabela for its product before the AJAX price call.
 
     // Roberlo requires a tabela to be active so U_GATPROD.APW returns the right product.
     // searchProducts() already populates productTabela for every found product,
