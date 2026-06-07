@@ -3,7 +3,6 @@ import type { AgentBrowserRunner } from './agent-browser-runner.js';
 import { parseBRL } from './driver-helpers.js';
 
 const LOGIN_URL = 'https://representante.autoamerica.com.br:5100/portal/U_PortalLogin.apw';
-const ORC_LIST_URL = 'https://representante.autoamerica.com.br:5100/portal/U_OrcLst.apw';
 
 // CJ_CONDPAG option values for each plan label
 const PARCELAS_CODE: Record<string, string> = {
@@ -27,7 +26,12 @@ export class AutoAmericaDriver implements IPortalDriver {
   private async evalRaw(js: string): Promise<string> {
     const result = await this.runner(['eval', js]);
     if (result.code !== 0) throw new Error(`eval failed: ${result.stderr.trim()}`);
-    return result.stdout.trim();
+    // agent-browser eval serialises the return value as JSON (strings get outer quotes).
+    // Parse once to recover the actual JS value, then coerce to string.
+    const raw = result.stdout.trim();
+    if (!raw) return '';
+    const parsed: unknown = JSON.parse(raw);
+    return parsed == null ? '' : String(parsed);
   }
 
   private async evalJson<T>(js: string): Promise<T> {
@@ -72,7 +76,11 @@ export class AutoAmericaDriver implements IPortalDriver {
   }
 
   async startQuote(opts: StartQuoteOpts): Promise<DriverResult> {
-    await this.navigate(ORC_LIST_URL);
+    // The orçamento URL carries a session-specific PR token — navigate via menu link,
+    // not a hardcoded URL, to avoid 500 errors.
+    await this.evalRaw(
+      `document.querySelector('a[href*="U_orcamento.apw"]')?.click(); 'ok'`,
+    );
     await this.waitLoad();
 
     // Click "Novo Orçamento"
@@ -87,11 +95,18 @@ export class AutoAmericaDriver implements IPortalDriver {
     );
     await this.waitLoad();
 
-    // Find client option value by searching CNPJ/name in pre-loaded options
+    // Find client option value by searching CNPJ/name in pre-loaded options.
+    // The portal stores CNPJs as "027980912/0001 - NAME" (9-digit padded root + branch).
+    // Normalize: strip non-digits from the option text and match the first 8
+    // digits of the search term (the CNPJ company root) anywhere inside it.
     const clientValue = await this.evalRaw(`
       var term = ${JSON.stringify(opts.client)};
+      var termRoot = term.replace(/[^0-9]/g, '').substring(0, 8);
       var opt = Array.from(document.getElementById('CJ_CLIENTE').options)
-        .find(o => o.text.includes(term));
+        .find(o => {
+          var textDigits = o.text.replace(/[^0-9]/g, '');
+          return textDigits.includes(termRoot) || o.text.includes(term);
+        });
       opt ? opt.value : ''
     `);
 
@@ -99,11 +114,34 @@ export class AutoAmericaDriver implements IPortalDriver {
       return { status: 'error', summary: `Cliente não encontrado: ${opts.client}`, next_actions: ['Verifique o CNPJ/nome do cliente'] };
     }
 
-    // Set all header fields via jQuery select2
+    // 1. Select client and trigger SelCliente() which loads price tables via async AJAX.
     await this.evalRaw(`
-      jQuery('#CJ_CLIENTE').val(${JSON.stringify(clientValue)}).trigger('change');
+      jQuery('#CJ_CLIENTE').val(${JSON.stringify(clientValue)});
+      SelCliente();
+      'done'
+    `);
+
+    // Wait for SelCliente() AJAX to populate CJ_TABELA options.
+    await this.waitFor(`document.getElementById('CJ_TABELA')?.options.length > 1`, 10000);
+
+    // 2. Set price table and call selProd() which loads products via synchronous AJAX.
+    // opts.tabelaPrecos may be "099 - DESCRIÇÃO"; match by option value OR text.
+    const tabelaSearch = JSON.stringify(opts.tabelaPrecos ?? '099');
+    await this.evalRaw(`
+      var tSearch = ${tabelaSearch};
+      var tOpt = Array.from(document.getElementById('CJ_TABELA').options)
+        .find(o => o.value && (o.value === tSearch || o.text === tSearch || o.text.includes(tSearch) || tSearch.startsWith(o.value)));
+      jQuery('#CJ_TABELA').val(tOpt ? tOpt.value : tSearch);
+      selProd();
+      'done'
+    `);
+
+    // Wait for products to be populated (selProd uses async:false, but we verify anyway).
+    await this.waitFor(`document.getElementById('CK_PRODUTO01')?.options.length > 1`, 10000);
+
+    // 3. Set remaining header fields.
+    await this.evalRaw(`
       jQuery('#CJ_XTPORC').val('3').trigger('change');
-      jQuery('#CJ_TABELA').val('099').trigger('change');
       jQuery('#CJ_TPFRETE').val('C').trigger('change');
       jQuery('#CJ_XTRANSP').val('000157').trigger('change');
       'done'
@@ -111,6 +149,42 @@ export class AutoAmericaDriver implements IPortalDriver {
 
     this.itemCount = 0;
     return { status: 'success', summary: `Orçamento iniciado para ${opts.client}` };
+  }
+
+  async readUnitsPerBox(productCode: string): Promise<number | undefined> {
+    // Call U_GATPROD.APW directly with async:false — same endpoint the portal uses
+    // internally in gatProduto(), but without depending on DOM event handlers or polling.
+    // The PR session token is taken from the current page URL.
+    const raw = await this.evalRaw(`
+      (function() {
+        var pr = new URLSearchParams(location.search).get('PR') || '';
+        var result = '';
+        jQuery.ajax({
+          type: 'POST',
+          url: 'U_GATPROD.APW' + (pr ? '?PR=' + encodeURIComponent(pr) : ''),
+          data: {
+            produto:    ${JSON.stringify(productCode)},
+            tabela:     jQuery('#CJ_TABELA').val() || '',
+            cliente:    jQuery('#CJ_CLIENTE').val() || '',
+            descvista:  0,
+            descretir:  0,
+            descredesp: 0,
+            valfrete:   0
+          },
+          async: false,
+          success: function(data) {
+            if (!data || data.toUpperCase().indexOf('<META HTTP-EQUIV') >= 0) return;
+            try {
+              var oRet = JSON.parse(data);
+              if (!oRet.erro) result = String(oRet.quantidadeembalagem ?? '');
+            } catch(e) {}
+          }
+        });
+        return result;
+      })()
+    `);
+    const n = parseInt(raw, 10);
+    return n > 0 ? n : undefined;
   }
 
   async searchProducts(terms: string): Promise<DriverResult<ProductOption[]>> {
@@ -147,6 +221,41 @@ export class AutoAmericaDriver implements IPortalDriver {
     await this.evalRaw(
       `jQuery('#CK_PRODUTO${n}').val(${JSON.stringify(productCode)}).trigger('change'); 'done'`,
     );
+
+    // Populate price field by calling U_GATPROD.APW directly (async:false).
+    // jQuery .trigger('change') does NOT fire native onchange attributes, so
+    // gatProduto() is never called automatically — we replicate its AJAX call here.
+    await this.evalRaw(`
+      (function() {
+        var pr = new URLSearchParams(location.search).get('PR') || '';
+        jQuery.ajax({
+          type: 'POST',
+          url: 'U_GATPROD.APW' + (pr ? '?PR=' + encodeURIComponent(pr) : ''),
+          data: {
+            produto:    ${JSON.stringify(productCode)},
+            tabela:     jQuery('#CJ_TABELA').val() || '',
+            cliente:    jQuery('#CJ_CLIENTE').val() || '',
+            descvista:  0,
+            descretir:  0,
+            descredesp: 0,
+            valfrete:   0
+          },
+          async: false,
+          success: function(data) {
+            if (!data || data.toUpperCase().indexOf('<META HTTP-EQUIV') >= 0) return;
+            try {
+              var oRet = JSON.parse(data);
+              if (!oRet.erro) {
+                var priceEl = document.getElementById('CK_XPRCIMP${n}');
+                if (priceEl) priceEl.value = oRet.preco || '';
+                var qtdEl = document.getElementById('QTD_EMB${n}');
+                if (qtdEl) qtdEl.value = String(oRet.quantidadeembalagem || '1');
+              }
+            } catch(e) {}
+          }
+        });
+      })(); 'done'
+    `);
 
     // Set quantity and trigger price recalculation
     await this.evalRaw(`
