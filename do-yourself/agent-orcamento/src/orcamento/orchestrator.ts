@@ -3,6 +3,7 @@ import type { PlatformConfig, IPortalDriver } from '../platforms/types.js';
 import type { Prompter } from '../io/prompt.js';
 import type { OrderLine } from './order.js';
 import type { AliasRepository } from '../db/alias-repository.js';
+import type { ExportWriter } from '../io/export-writer.js';
 import { resolveLine, type ResolvedLine } from './resolver.js';
 
 export interface RunOrcamentoInput {
@@ -12,14 +13,15 @@ export interface RunOrcamentoInput {
   driver: IPortalDriver;
   prompter: Prompter;
   repo: AliasRepository;
+  exportWriter: ExportWriter;
 }
 
-export interface RunOrcamentoResult { total: number; parcelas: string; }
+export interface RunOrcamentoResult { total: number; parcelas: string; exportPath: string; }
 
 const MAX_BUMP_ITERATIONS = 1000;
 
 export async function runOrcamento(input: RunOrcamentoInput): Promise<RunOrcamentoResult> {
-  const { platform, client, orderLines, driver, prompter, repo } = input;
+  const { platform, client, orderLines, driver, prompter, repo, exportWriter } = input;
 
   await driver.login();
   await driver.startQuote({
@@ -85,5 +87,18 @@ export async function runOrcamento(input: RunOrcamentoInput): Promise<RunOrcamen
   await driver.setParcelas(plan);
   await driver.save();
 
-  return { total, parcelas: plan.label };
+  // Export obrigatório: baixa o PDF do orçamento recém-salvo da listagem.
+  const exported = await driver.exportQuote();
+  if (exported.status !== 'success' || !exported.data) {
+    throw new Error(
+      `Falha no export obrigatório do orçamento (já salvo na listagem): ${exported.summary}`,
+    );
+  }
+  const exportPath = await exportWriter({
+    platform: platform.id,
+    clientName: exported.data.clientName,
+    pdfBase64: exported.data.pdfBase64,
+  });
+
+  return { total, parcelas: plan.label, exportPath };
 }
