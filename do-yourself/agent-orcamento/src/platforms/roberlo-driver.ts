@@ -40,7 +40,12 @@ export class RoberloDriver implements IPortalDriver {
   private async evalRaw(js: string): Promise<string> {
     const result = await this.runner(['eval', js]);
     if (result.code !== 0) throw new Error(`eval failed: ${result.stderr.trim()}`);
-    return result.stdout.trim();
+    // agent-browser eval serialises the return value as JSON (strings get outer quotes).
+    // Parse once to recover the actual JS value, then coerce to string.
+    const raw = result.stdout.trim();
+    if (!raw) return '';
+    const parsed: unknown = JSON.parse(raw);
+    return parsed == null ? '' : String(parsed);
   }
 
   private async evalJson<T>(js: string): Promise<T> {
@@ -157,6 +162,62 @@ export class RoberloDriver implements IPortalDriver {
     return '';
   }
 
+  async readUnitsPerBox(productCode: string): Promise<number | undefined> {
+    const slot = '01';
+
+    // Roberlo requires a tabela to be active so U_GATPROD.APW returns the right product.
+    // searchProducts() already populates productTabela for every found product,
+    // so by the time readUnitsPerBox is called the tabela code should be cached.
+    const tabelaCode = this.productTabela.get(productCode) ?? '';
+    if (tabelaCode) {
+      await this.evalRaw(
+        `jQuery('#CK_XTABELA${slot}').val(${JSON.stringify(tabelaCode)}).trigger('change'); 'done'`,
+      );
+      await new Promise(r => setTimeout(r, 300));
+    } else {
+      const current = await this.evalRaw(`document.getElementById('CK_XTABELA${slot}')?.value || ''`);
+      if (!current) await this.selectFirstTabela(slot);
+    }
+
+    // Call U_GATPROD.APW directly with async:false — same endpoint the portal uses
+    // internally in gatProduto(), but without depending on DOM event handlers or polling.
+    const raw = await this.evalRaw(`
+      (function() {
+        var pr = new URLSearchParams(location.search).get('PR') || '';
+        var result = '';
+        jQuery.ajax({
+          type: 'POST',
+          url: 'U_GATPROD.APW' + (pr ? '?PR=' + encodeURIComponent(pr) : ''),
+          data: {
+            produto:    ${JSON.stringify(productCode)},
+            tabela:     jQuery('#CK_XTABELA${slot}').val() || '',
+            cliente:    jQuery('#CJ_CLIENTE').val() || '',
+            descvista:  0,
+            descretir:  0,
+            descredesp: 0,
+            valfrete:   0
+          },
+          async: false,
+          success: function(data) {
+            if (!data || data.toUpperCase().indexOf('<META HTTP-EQUIV') >= 0) return;
+            try {
+              var oRet = JSON.parse(data);
+              if (oRet.erro) { result = '__ERROR__'; return; }
+              result = String(oRet.quantidadeembalagem ?? '');
+            } catch(e) {}
+          },
+          error: function() {
+            result = '__ERROR__';
+          }
+        });
+        return result;
+      })()
+    `);
+    if (raw === '__ERROR__') return undefined;
+    const units = parseInt(raw, 10);
+    return units > 0 ? units : undefined;
+  }
+
   async searchProducts(terms: string): Promise<DriverResult<ProductOption[]>> {
     // Ensure item 01 has a tabela selected so products are loaded
     const n = '01';
@@ -231,6 +292,51 @@ export class RoberloDriver implements IPortalDriver {
 
     // Set product
     await this.evalRaw(`jQuery('#CK_PRODUTO${n}').val(${JSON.stringify(productCode)}).trigger('change'); 'done'`);
+
+    // Populate price field by calling U_GATPROD.APW directly (async:false).
+    // jQuery .trigger('change') does NOT fire native onchange attributes, so
+    // gatProduto() is never called automatically — we replicate its AJAX call here.
+    // Roberlo uses per-line tabela (CK_XTABELA${n}), not the global CJ_TABELA.
+    const priceResult = await this.evalRaw(`
+      (function() {
+        var pr = new URLSearchParams(location.search).get('PR') || '';
+        var result = '';
+        jQuery.ajax({
+          type: 'POST',
+          url: 'U_GATPROD.APW' + (pr ? '?PR=' + encodeURIComponent(pr) : ''),
+          data: {
+            produto:    ${JSON.stringify(productCode)},
+            tabela:     jQuery('#CK_XTABELA${n}').val() || '',
+            cliente:    jQuery('#CJ_CLIENTE').val() || '',
+            descvista:  0,
+            descretir:  0,
+            descredesp: 0,
+            valfrete:   0
+          },
+          async: false,
+          success: function(data) {
+            if (!data || data.toUpperCase().indexOf('<META HTTP-EQUIV') >= 0) return;
+            try {
+              var oRet = JSON.parse(data);
+              if (oRet.erro) { result = '__ERROR__'; return; }
+              var priceEl = document.getElementById('CK_XPRCIMP${n}');
+              if (priceEl) priceEl.value = oRet.preco || '';
+              var qtdEl = document.getElementById('QTD_EMB${n}');
+              if (qtdEl) qtdEl.value = oRet.quantidadeembalagem != null ? String(oRet.quantidadeembalagem) : '';
+              result = oRet.preco || '';
+            } catch(e) {}
+          },
+          error: function() {
+            result = '__ERROR__';
+          }
+        });
+        return result;
+      })()`);
+
+    if (priceResult === '__ERROR__') {
+      this.itemCount -= 1;
+      return { status: 'error', summary: `Falha ao buscar preço do produto ${productCode} (U_GATPROD.APW)` };
+    }
 
     // Set quantity (field is disabled — must enable first)
     await this.evalRaw(`
