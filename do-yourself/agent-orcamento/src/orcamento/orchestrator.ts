@@ -54,17 +54,22 @@ export async function runOrcamento(input: RunOrcamentoInput): Promise<RunOrcamen
     if (++iterations > MAX_BUMP_ITERATIONS) {
       throw new Error('Loop de valor-mínimo excedeu o limite de iterações.');
     }
-    const idx = await prompter.askInt(
+    const indices = await prompter.askInts(
       `Total ${total.toFixed(2)} < mínimo ${platform.minOrderValue}. Qual produto aumentar (1 caixa)?\n` +
-      lines.map((l, i) => `${i + 1}) ${l.productName} (${boxes.get(l.productCode)} cx)`).join('\n') +
-      '\nNúmero:',
+      lines.map((l, i) => `${i + 1}) ${l.productCode} - ${l.productName} (${boxes.get(l.productCode)} cx)`).join('\n'),
     );
-    const target = lines[idx - 1];
-    if (!target) continue;
-    const newBoxes = (boxes.get(target.productCode) ?? 0) + 1;
-    boxes.set(target.productCode, newBoxes);
-    await driver.addLine(target.productCode, newBoxes * target.unitsPerBox);
-    total = (await driver.readOrderTotal()).data ?? total;
+    let anyValid = false;
+    for (const idx of indices) {
+      const target = lines[idx - 1];
+      if (!target) continue;
+      const newBoxes = (boxes.get(target.productCode) ?? 0) + 1;
+      boxes.set(target.productCode, newBoxes);
+      await driver.updateLine(target.productCode, newBoxes * target.unitsPerBox);
+      anyValid = true;
+    }
+    if (anyValid) {
+      total = (await driver.readOrderTotal()).data ?? total;
+    }
   }
 
   // Discounts.

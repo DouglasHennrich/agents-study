@@ -16,6 +16,7 @@ function priceModelDriver(pricePerBox: Record<string, number>) {
     startQuote: vi.fn(async () => ok()),
     searchProducts: vi.fn(),
     addLine: vi.fn(async (code: string, u: number) => { units[code] = u; return ok(); }),
+    updateLine: vi.fn(async (code: string, u: number) => { units[code] = u; return ok(); }),
     readLinePrice: vi.fn(async () => ok({ unit: 0, total: 0 })),
     applyDiscount: vi.fn(async () => ok()),
     readOrderTotal: vi.fn(async () => {
@@ -63,7 +64,7 @@ const stubExportWriter = () => vi.fn(async () => '/tmp/orc/CLIENTE STUB.pdf');
 describe('runOrcamento', () => {
   it('stops at minimum when total already meets it; sets correct parcelas; saves', async () => {
     const driver = priceModelDriver({ A: 3000 }); // 1 box = 3000 >= 2500
-    const prompter: Prompter = { ask: vi.fn(), choose: vi.fn(), askInt: vi.fn() };
+    const prompter: Prompter = { ask: vi.fn(), choose: vi.fn(), askInt: vi.fn(), askInts: vi.fn() };
     const result = await runOrcamento({
       platform: autoamerica, client: 'c', orderLines: [orderLine('A', 1)],
       driver: driver as unknown as IPortalDriver, prompter, repo: stubRepo(), exportWriter: stubExportWriter(),
@@ -77,20 +78,20 @@ describe('runOrcamento', () => {
   it('bumps 1 box at a time when below minimum, asking the user each step', async () => {
     // Each box = 1000; start with 1 box = 1000; need >= 2500 -> 3 boxes
     const driver = priceModelDriver({ A: 1000 });
-    const askInt = vi.fn(async () => 1); // user always picks line #1
-    const prompter: Prompter = { ask: vi.fn(), choose: vi.fn(), askInt };
+    const askInts = vi.fn(async () => [1]); // user always picks line #1
+    const prompter: Prompter = { ask: vi.fn(), choose: vi.fn(), askInt: vi.fn(), askInts };
     await runOrcamento({
       platform: autoamerica, client: 'c', orderLines: [orderLine('A', 1)],
       driver: driver as unknown as IPortalDriver, prompter, repo: stubRepo(), exportWriter: stubExportWriter(),
     });
-    // Should end up with 3 boxes = 18 units (1 initial + 2 bumps)
+    // Should end up with 3 boxes = 18 units (1 initial + 2 bumps via updateLine)
     expect(driver._units.A).toBe(18);
-    expect(askInt).toHaveBeenCalledTimes(2); // asked twice to bump from 1->2->3
+    expect(askInts).toHaveBeenCalledTimes(2); // asked twice to bump from 1->2->3
   });
 
   it('applies 15% line discount when a line exceeds 10 boxes (Auto America)', async () => {
     const driver = priceModelDriver({ A: 300 }); // 11 boxes * 300 = 3300 >= 2500
-    const prompter: Prompter = { ask: vi.fn(), choose: vi.fn(), askInt: vi.fn() };
+    const prompter: Prompter = { ask: vi.fn(), choose: vi.fn(), askInt: vi.fn(), askInts: vi.fn() };
     await runOrcamento({
       platform: autoamerica, client: 'c', orderLines: [orderLine('A', 11)],
       driver: driver as unknown as IPortalDriver, prompter, repo: stubRepo(), exportWriter: stubExportWriter(),
@@ -100,7 +101,7 @@ describe('runOrcamento', () => {
 
   it('exports the quote after saving and returns the written path', async () => {
     const driver = priceModelDriver({ A: 3000 });
-    const prompter: Prompter = { ask: vi.fn(), choose: vi.fn(), askInt: vi.fn() };
+    const prompter: Prompter = { ask: vi.fn(), choose: vi.fn(), askInt: vi.fn(), askInts: vi.fn() };
     const exportWriter = vi.fn(async () => '/out/autoamerica/CLIENTE STUB.pdf');
     const result = await runOrcamento({
       platform: autoamerica, client: 'c', orderLines: [orderLine('A', 1)],
@@ -118,7 +119,7 @@ describe('runOrcamento', () => {
   it('throws when the mandatory export fails', async () => {
     const driver = priceModelDriver({ A: 3000 });
     driver.exportQuote = vi.fn(async () => ({ status: 'error' as const, summary: 'listagem vazia' }));
-    const prompter: Prompter = { ask: vi.fn(), choose: vi.fn(), askInt: vi.fn() };
+    const prompter: Prompter = { ask: vi.fn(), choose: vi.fn(), askInt: vi.fn(), askInts: vi.fn() };
     await expect(runOrcamento({
       platform: autoamerica, client: 'c', orderLines: [orderLine('A', 1)],
       driver: driver as unknown as IPortalDriver, prompter, repo: stubRepo(), exportWriter: stubExportWriter(),

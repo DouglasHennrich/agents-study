@@ -292,6 +292,28 @@ export class AutoAmericaDriver implements IPortalDriver {
     return { status: 'success', summary: `Item ${n}: produto ${productCode} × ${units} un` };
   }
 
+  async updateLine(productCode: string, units: number): Promise<DriverResult> {
+    const result = await this.evalRaw(`
+      var n = null;
+      for (var i = 1; i <= ${this.itemCount}; i++) {
+        var nn = String(i).padStart(2,'0');
+        if (document.getElementById('CK_PRODUTO'+nn)?.value === ${JSON.stringify(productCode)}) { n = nn; break; }
+      }
+      if (!n) 'not_found';
+      else {
+        var q = document.getElementById('CK_QTDVEN'+n);
+        q.value = ${JSON.stringify(String(units))};
+        q.dispatchEvent(new Event('change', {bubbles:true}));
+        VldValor(n);
+        'done'
+      }
+    `);
+    if (result === 'not_found') {
+      return { status: 'error', summary: `Produto ${productCode} não encontrado nas linhas` };
+    }
+    return { status: 'success', summary: `Produto ${productCode} atualizado para ${units} un` };
+  }
+
   async readLinePrice(productCode: string): Promise<DriverResult<{ unit: number; total: number }>> {
     const raw = await this.evalRaw(`
       var n = null;

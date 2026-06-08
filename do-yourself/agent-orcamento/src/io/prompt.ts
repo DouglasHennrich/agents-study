@@ -9,6 +9,8 @@ export interface Prompter {
   choose(question: string, options: ProductOption[]): Promise<ProductOption | null>;
   /** Ask for a positive integer (e.g. units per box). */
   askInt(question: string): Promise<number>;
+  /** Ask for one or more positive integers separated by commas. */
+  askInts(question: string): Promise<number[]>;
 }
 
 export function formatOptions(options: ProductOption[]): string {
@@ -58,6 +60,16 @@ export class ConsolePrompter implements Prompter {
       const n = Number(raw);
       if (Number.isInteger(n) && n > 0) return n;
       output.write('Digite um número inteiro positivo.\n');
+    }
+  }
+
+  async askInts(question: string): Promise<number[]> {
+    for (;;) {
+      const raw = await this.ask(question);
+      const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+      const nums = parts.map(Number);
+      if (parts.length > 0 && nums.every(n => Number.isInteger(n) && n > 0)) return nums;
+      output.write('Digite um ou mais números inteiros positivos separados por vírgula.\n');
     }
   }
 
