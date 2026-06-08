@@ -83,6 +83,9 @@ program
       console.log(`Total: R$ ${result.total.toFixed(2).replace('.', ',')}`);
       console.log(`Parcelas: ${result.parcelas}`);
       console.log(`PDF exportado: ${result.exportPath}`);
+    } catch (e) {
+      console.error(`\nErro: ${(e as Error).message}`);
+      process.exitCode = 1;
     } finally {
       prompter.close();
       repo.close();

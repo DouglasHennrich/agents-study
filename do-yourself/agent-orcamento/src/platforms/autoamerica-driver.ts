@@ -158,13 +158,16 @@ export class AutoAmericaDriver implements IPortalDriver {
   }
 
   async readUnitsPerBox(productCode: string): Promise<number | undefined> {
-    // Call U_GATPROD.APW directly with async:false — same endpoint the portal uses
-    // internally in gatProduto(), but without depending on DOM event handlers or polling.
-    // The PR session token is taken from the current page URL.
+    // Safe to mutate CK_PRODUTO01 here: readUnitsPerBox is always called during
+    // resolveLine (before any addLine), and addLine for item 01 always re-sets
+    // CK_PRODUTO01 before its own U_GATPROD.APW call.
+    // U_GATPROD.APW requires the product to be selected in a form row to return
+    // quantidadeembalagem — mirroring what addLine does before its own AJAX call.
     const raw = await this.evalRaw(`
       (function() {
         var pr = new URLSearchParams(location.search).get('PR') || '';
         var result = '';
+        jQuery('#CK_PRODUTO01').val(${JSON.stringify(productCode)});
         jQuery.ajax({
           type: 'POST',
           url: 'U_GATPROD.APW' + (pr ? '?PR=' + encodeURIComponent(pr) : ''),
@@ -357,6 +360,9 @@ export class AutoAmericaDriver implements IPortalDriver {
   async save(): Promise<DriverResult> {
     await this.evalRaw(`document.getElementById('btSalvar').click(); 'clicked'`);
     await this.waitLoad();
+    // After save the portal redirects to U_orcamento.apw (listing).
+    // Wait for at least one table row so exportQuote() doesn't run on a half-loaded page.
+    await this.waitFor(`document.querySelector('table tbody tr')`, 10000);
     return { status: 'success', summary: 'Orçamento salvo com sucesso' };
   }
 

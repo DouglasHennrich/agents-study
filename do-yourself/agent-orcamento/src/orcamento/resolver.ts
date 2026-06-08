@@ -39,9 +39,14 @@ export async function resolveLine(line: OrderLine, deps: ResolveDeps): Promise<R
       options,
     );
     if (picked) {
-      const detected = typeof driver.readUnitsPerBox === 'function'
-        ? await driver.readUnitsPerBox(picked.code)
-        : undefined;
+      let detected: number | undefined;
+      if (typeof driver.readUnitsPerBox === 'function') {
+        try {
+          detected = await driver.readUnitsPerBox(picked.code);
+        } catch {
+          detected = undefined;
+        }
+      }
       const unitsPerBox = detected ?? await prompter.askInt(`Quantas unidades = 1 caixa de "${picked.name}"?`);
       const extraRaw = await prompter.ask(
         `Outros nomes para este produto (separados por vírgula, ou Enter para pular):`,
